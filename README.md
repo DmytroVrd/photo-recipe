@@ -2,7 +2,7 @@
 
 AI Photo Recipe is a Telegram bot that turns a fridge photo into practical recipe ideas. A user sends a photo, the bot detects visible ingredients with Gemini Vision, generates structured recipes, creates dish previews, and lets the user save recipes, request variations, or tune personal food preferences.
 
-The project is built as a practical AI/Python pet project: async Telegram UX, multimodal AI, strict Pydantic outputs, PostgreSQL persistence, Redis caching, Playwright scraping, pandas analytics, Docker, and CI.
+It combines async Telegram UX, multimodal AI, strict Pydantic outputs, PostgreSQL persistence, Redis caching, Playwright scraping, pandas analytics, Docker, and CI.
 
 ## Demo
 
@@ -189,9 +189,7 @@ uvicorn recipe.api.main:app --reload
 | `CACHE_TTL_SECONDS` | Fridge photo analysis cache TTL |
 | `IMAGE_CACHE_TTL_SECONDS` | Dish preview image cache TTL |
 
-## Why This Is Interesting
-
-This is more than a simple prompt wrapper. It demonstrates:
+## What It Demonstrates
 
 - multimodal AI integration with real user photos;
 - strict JSON validation instead of trusting raw LLM text;
