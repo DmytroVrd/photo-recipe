@@ -173,6 +173,27 @@ Run the optional API locally:
 uvicorn recipe.api.main:app --reload
 ```
 
+## Deployment
+
+There are two practical ways to run the project:
+
+1. **Local Docker setup** - use `docker compose up --build` to run the bot, PostgreSQL, Redis, and migrations on your machine.
+2. **Server setup without Docker** - run the bot as a normal Python process and use managed PostgreSQL/Redis services.
+
+A typical server setup looks like this:
+
+- **Bot worker**: Python venv on the server running `python -m recipe.bot.main` under `nohup` or a systemd-user unit; aiogram polls Telegram directly, no public port required.
+- **PostgreSQL**: an external managed service (Neon, Supabase, or any hosted Postgres); point `DATABASE_URL` at it.
+- **Redis**: an external managed service (Upstash); point `REDIS_URL` at the `rediss://` TLS endpoint.
+
+The application code is identical across local and server environments. SQLAlchemy and `redis-py` read endpoints from `DATABASE_URL` / `REDIS_URL`, so switching from docker-compose service names (`db:5432`, `redis:6379`) to managed endpoints requires only environment variable changes.
+
+Run migrations on the production database before the first start:
+
+```bash
+alembic upgrade head
+```
+
 ## Environment Variables
 
 | Variable | Description |
