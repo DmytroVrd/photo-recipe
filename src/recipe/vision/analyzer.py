@@ -61,6 +61,7 @@ def _analyze_via_gemini(
     mime_type: str,
     preferences: UserPreferences | None,
 ) -> RecipeBatch:
+    logger.info("Analyzing photo with Gemini model=%s", settings.GEMINI_MODEL)
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
     image = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
     response = client.models.generate_content(
@@ -85,6 +86,7 @@ def _analyze_via_openrouter(
     if not settings.OPENROUTER_API_KEY:
         raise RuntimeError("OPENROUTER_API_KEY is required for the fallback vision path")
 
+    logger.info("Analyzing photo with OpenRouter vision model=%s", settings.OPENROUTER_VISION_MODEL)
     client = OpenAI(
         api_key=settings.OPENROUTER_API_KEY,
         base_url=settings.OPENROUTER_BASE_URL,
@@ -93,7 +95,7 @@ def _analyze_via_openrouter(
     image_url = f"data:{mime_type};base64,{image_b64}"
 
     response = client.chat.completions.create(
-        model="google/gemini-2.0-flash-exp:free",
+        model=settings.OPENROUTER_VISION_MODEL,
         messages=[
             {"role": "system", "content": _SYSTEM},
             {
@@ -140,5 +142,7 @@ def analyze_photo(
                 logger.warning(
                     "Gemini direct failed (%s); falling back to OpenRouter vision", exc
                 )
+        except Exception:
+            logger.warning("Gemini direct failed; falling back to OpenRouter vision", exc_info=True)
 
     return _analyze_via_openrouter(image_bytes, mime_type, preferences)

@@ -203,6 +203,7 @@ alembic upgrade head
 | `GEMINI_MODEL` | Gemini model, for example `gemini-2.5-flash` |
 | `OPENROUTER_API_KEY` | OpenRouter key for URL normalization and fallback LLM work |
 | `OPENROUTER_MODEL` | OpenRouter model, for example a free instruct model |
+| `OPENROUTER_VISION_MODEL` | OpenRouter fallback model for fridge photo analysis |
 | `OPENROUTER_BASE_URL` | OpenRouter OpenAI-compatible base URL |
 | `DATABASE_URL` | Async SQLAlchemy PostgreSQL URL |
 | `REDIS_URL` | Redis URL |

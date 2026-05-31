@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_MODEL: str = "meta-llama/llama-3.3-70b-instruct:free"
+    OPENROUTER_VISION_MODEL: str = "google/gemini-2.0-flash-exp:free"
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/photo_recipe"
