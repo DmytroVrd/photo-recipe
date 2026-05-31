@@ -1,6 +1,6 @@
 # AI Photo Recipe
 
-AI Photo Recipe is a Telegram bot that turns a fridge photo into practical recipe ideas. A user sends a photo, the bot detects visible ingredients with Gemini Vision, generates structured recipes, creates dish previews, and lets the user save recipes, request variations, or tune personal food preferences.
+AI Photo Recipe is a Telegram bot that turns a fridge photo into practical recipe ideas. A user sends a photo, the bot detects visible ingredients with Gemini Vision or an OpenRouter vision fallback, generates structured recipes, creates dish previews, and lets the user save recipes, request variations, or tune personal food preferences.
 
 It combines async Telegram UX, multimodal AI, strict Pydantic outputs, PostgreSQL persistence, Redis caching, Playwright scraping, pandas analytics, Docker, and CI.
 
@@ -40,7 +40,7 @@ It combines async Telegram UX, multimodal AI, strict Pydantic outputs, PostgreSQ
 | Area | Tools |
 | --- | --- |
 | Telegram bot | aiogram 3.x |
-| Vision and recipe generation | Gemini API |
+| Vision and recipe generation | Gemini API with OpenRouter fallback |
 | LLM fallback / URL normalization | OpenRouter via OpenAI-compatible client |
 | Image previews | Pollinations.ai |
 | Scraping | Playwright |
@@ -56,7 +56,7 @@ It combines async Telegram UX, multimodal AI, strict Pydantic outputs, PostgreSQ
 ```text
 Telegram user
   -> aiogram handlers
-  -> Gemini Vision / OpenRouter / Playwright
+  -> Gemini Vision / OpenRouter fallback / Playwright
   -> Pydantic RecipeBatch validation
   -> PostgreSQL recipe history and favorites
   -> Redis photo cache, image cache, rate limits
@@ -66,7 +66,7 @@ Telegram user
 Key modules:
 
 - `src/recipe/bot/handlers/photo.py` handles fridge photos, cache checks, retries, and recipe delivery.
-- `src/recipe/vision/analyzer.py` calls Gemini Vision and validates the recipe JSON.
+- `src/recipe/vision/analyzer.py` calls Gemini Vision, falls back to OpenRouter vision when needed, and validates the recipe JSON.
 - `src/recipe/bot/presentation.py` formats Telegram recipe cards and manages dish preview caching.
 - `src/recipe/bot/handlers/settings.py` manages nutrition, diet style, servings, and avoid list.
 - `src/recipe/bot/handlers/favorites.py` handles save, remove, cached favorite previews, and similar recipes.
@@ -203,7 +203,7 @@ alembic upgrade head
 | `GEMINI_MODEL` | Gemini model, for example `gemini-2.5-flash` |
 | `OPENROUTER_API_KEY` | OpenRouter key for URL normalization and fallback LLM work |
 | `OPENROUTER_MODEL` | OpenRouter model, for example a free instruct model |
-| `OPENROUTER_VISION_MODEL` | OpenRouter fallback model for fridge photo analysis, for example `openrouter/free` |
+| `OPENROUTER_VISION_MODEL` | OpenRouter fallback model for fridge photo analysis, for example `openrouter/free` on shared hosts where Gemini direct access is blocked |
 | `OPENROUTER_BASE_URL` | OpenRouter OpenAI-compatible base URL |
 | `DATABASE_URL` | Async SQLAlchemy PostgreSQL URL |
 | `REDIS_URL` | Redis URL |
