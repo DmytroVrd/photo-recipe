@@ -93,7 +93,7 @@ def _analyze_via_openrouter(
     image_url = f"data:{mime_type};base64,{image_b64}"
 
     response = client.chat.completions.create(
-        model=f"google/{settings.GEMINI_MODEL}",
+        model="google/gemini-2.0-flash-exp:free",
         messages=[
             {"role": "system", "content": _SYSTEM},
             {
