@@ -16,8 +16,9 @@ from recipe.schemas.recipe import Recipe, RecipeBatch
 
 logger = logging.getLogger(__name__)
 
-_IMAGE_TIMEOUT_SECONDS = 45
+_IMAGE_TIMEOUT_SECONDS = 35
 _POLLINATIONS_MIN_INTERVAL_SECONDS = 20
+_POLLINATIONS_MAX_ATTEMPTS = 2
 _pollinations_lock = asyncio.Lock()
 _last_pollinations_started_at = 0.0
 
@@ -136,6 +137,16 @@ def build_dish_image_url(recipe: Recipe) -> str:
     )
 
 
+def _dish_image_api_url(recipe: Recipe) -> str:
+    prompt = _dish_image_prompt(recipe)
+    if settings.POLLINATIONS_API_KEY:
+        return (
+            "https://gen.pollinations.ai/image/"
+            f"{quote(prompt)}?width=512&height=384&nologo=true&safe=true&private=true"
+        )
+    return build_dish_image_url(recipe)
+
+
 def _image_filename(recipe: Recipe) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", recipe.title.lower()).strip("-")
     return f"{slug or 'dish-preview'}.jpg"
@@ -195,7 +206,12 @@ async def _set_cached_dish_preview(
 async def _fetch_pollinations_dish_preview_bytes(recipe: Recipe) -> bytes | None:
     global _last_pollinations_started_at
 
-    url = build_dish_image_url(recipe)
+    url = _dish_image_api_url(recipe)
+    headers = (
+        {"Authorization": f"Bearer {settings.POLLINATIONS_API_KEY}"}
+        if settings.POLLINATIONS_API_KEY
+        else {}
+    )
     started_at = time.perf_counter()
     async with _pollinations_lock:
         wait_seconds = _POLLINATIONS_MIN_INTERVAL_SECONDS - (
@@ -213,13 +229,26 @@ async def _fetch_pollinations_dish_preview_bytes(recipe: Recipe) -> bytes | None
         async with httpx.AsyncClient(
             timeout=_IMAGE_TIMEOUT_SECONDS,
             follow_redirects=True,
+            headers=headers,
         ) as client:
-            for attempt in range(4):
+            for attempt in range(_POLLINATIONS_MAX_ATTEMPTS):
                 try:
                     response = await client.get(url)
-                    if response.status_code == 429 and attempt < 3:
+                    if response.status_code in {401, 402}:
+                        logger.warning(
+                            "Pollinations rejected dish image for %s with HTTP %s: %s",
+                            recipe.title,
+                            response.status_code,
+                            response.text[:300],
+                        )
+                        return None
+                    if (
+                        response.status_code == 429
+                        and attempt < _POLLINATIONS_MAX_ATTEMPTS - 1
+                    ):
                         retry_after = response.headers.get("retry-after")
-                        delay = int(retry_after) if retry_after and retry_after.isdigit() else 25
+                        delay = int(retry_after) if retry_after and retry_after.isdigit() else 10
+                        delay = min(delay, 15)
                         logger.info(
                             "Pollinations rate limited %s, retrying in %ss",
                             recipe.title,
@@ -240,7 +269,7 @@ async def _fetch_pollinations_dish_preview_bytes(recipe: Recipe) -> bytes | None
                     )
                     return response.content
                 except Exception:
-                    if attempt == 3:
+                    if attempt == _POLLINATIONS_MAX_ATTEMPTS - 1:
                         logger.warning(
                             "Pollinations dish image preview failed for %s after %.2fs",
                             recipe.title,

@@ -1,3 +1,8 @@
+from typing import Any
+
+import pytest
+
+from recipe.bot import presentation
 from recipe.bot.presentation import build_dish_image_url, format_intro, format_recipe_card
 from recipe.schemas.recipe import RecipeBatch
 
@@ -44,3 +49,48 @@ def test_dish_image_url_is_pollinations_url() -> None:
 
     assert url.startswith("https://image.pollinations.ai/prompt/")
     assert "nologo=true" in url
+
+
+def test_dish_image_api_uses_authenticated_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(presentation.settings, "POLLINATIONS_API_KEY", "test-key")
+
+    url = presentation._dish_image_api_url(_batch().recipes[0])
+
+    assert url.startswith("https://gen.pollinations.ai/image/")
+
+
+@pytest.mark.asyncio
+async def test_pollinations_queue_rejection_is_not_retried(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requests = 0
+
+    class FakeResponse:
+        status_code = 402
+        text = '{"error":"Queue full for IP"}'
+
+    class FakeClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> "FakeClient":
+            return self
+
+        async def __aexit__(self, *_: Any) -> None:
+            return None
+
+        async def get(self, _: str) -> FakeResponse:
+            nonlocal requests
+            requests += 1
+            return FakeResponse()
+
+    monkeypatch.setattr(presentation.settings, "POLLINATIONS_API_KEY", "")
+    monkeypatch.setattr(presentation.httpx, "AsyncClient", FakeClient)
+    monkeypatch.setattr(presentation, "_last_pollinations_started_at", 0.0)
+
+    result = await presentation._fetch_pollinations_dish_preview_bytes(
+        _batch().recipes[0]
+    )
+
+    assert result is None
+    assert requests == 1
