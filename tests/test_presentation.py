@@ -40,6 +40,7 @@ def test_recipe_card_uses_html_and_emoji() -> None:
     card = format_recipe_card(_batch().recipes[0], 1)
 
     assert "🍳 <b>Recipe 1: Cheesy Eggs</b>" in card
+    assert "👥 1 serving" in card
     assert "🛒 <b>Could buy:</b>" in card
     assert "🔥 <b>Nutrition estimate / serving</b>" in card
 

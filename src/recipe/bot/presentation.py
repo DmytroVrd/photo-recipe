@@ -56,9 +56,10 @@ def format_intro(batch: RecipeBatch, from_cache: bool = False) -> str:
 
 def format_recipe_card(recipe: Recipe, index: int) -> str:
     difficulty = f"{_difficulty_icon(recipe.difficulty)} {escape(recipe.difficulty.title())}"
+    servings_label = "serving" if recipe.servings == 1 else "servings"
     meta = (
         f"⏱ {recipe.total_time_minutes} min  |  "
-        f"👥 {recipe.servings} servings  |  {difficulty}"
+        f"👥 {recipe.servings} {servings_label}  |  {difficulty}"
     )
 
     ingredients = "\n".join(
