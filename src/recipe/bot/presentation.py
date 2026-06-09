@@ -187,7 +187,7 @@ async def get_cached_dish_preview(
     redis: Redis | None,
     recipe: Recipe,
 ) -> BufferedInputFile | None:
-    for provider in ("cloudflare", "pixazo", "pollinations"):
+    for provider in ("pixazo", "cloudflare", "pollinations"):
         cached = await _get_cached_dish_preview(redis, recipe, provider=provider)
         if cached is not None:
             return cached
@@ -396,10 +396,10 @@ async def _fetch_dish_preview(
     redis: Redis | None = None,
 ) -> BufferedInputFile | None:
     providers = []
-    if settings.CLOUDFLARE_ACCOUNT_ID and settings.CLOUDFLARE_API_TOKEN:
-        providers.append(("cloudflare", _fetch_cloudflare_dish_preview_bytes))
     if settings.PIXAZO_API_KEY:
         providers.append(("pixazo", _fetch_pixazo_dish_preview_bytes))
+    if settings.CLOUDFLARE_ACCOUNT_ID and settings.CLOUDFLARE_API_TOKEN:
+        providers.append(("cloudflare", _fetch_cloudflare_dish_preview_bytes))
     providers.append(("pollinations", _fetch_pollinations_dish_preview_bytes))
 
     for provider, fetch_image in providers:

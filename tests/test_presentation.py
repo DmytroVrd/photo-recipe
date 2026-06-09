@@ -179,3 +179,33 @@ async def test_cloudflare_decodes_generated_image(monkeypatch: pytest.MonkeyPatc
     )
 
     assert result == b"image-bytes"
+
+
+@pytest.mark.asyncio
+async def test_dish_preview_prefers_pixazo_over_cloudflare(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    async def fake_pixazo(_: Any) -> bytes:
+        calls.append("pixazo")
+        return b"pixazo-image"
+
+    async def fake_cloudflare(_: Any) -> bytes:
+        calls.append("cloudflare")
+        return b"cloudflare-image"
+
+    monkeypatch.setattr(presentation.settings, "PIXAZO_API_KEY", "test-key")
+    monkeypatch.setattr(presentation.settings, "CLOUDFLARE_ACCOUNT_ID", "account-id")
+    monkeypatch.setattr(presentation.settings, "CLOUDFLARE_API_TOKEN", "test-token")
+    monkeypatch.setattr(presentation, "_fetch_pixazo_dish_preview_bytes", fake_pixazo)
+    monkeypatch.setattr(
+        presentation,
+        "_fetch_cloudflare_dish_preview_bytes",
+        fake_cloudflare,
+    )
+
+    result = await presentation._fetch_dish_preview(_batch().recipes[0])
+
+    assert result is not None
+    assert calls == ["pixazo"]
