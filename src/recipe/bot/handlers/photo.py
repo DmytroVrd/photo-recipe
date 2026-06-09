@@ -58,6 +58,8 @@ async def handle_photo(message: Message, session: AsyncSession, redis: Redis) ->
     cache_variant = preferences.cache_key()
 
     photo = message.photo[-1]
+    cached_batch = None
+    cached_result_id = None
     await message.answer("📸 Photo received. Checking cache and preparing analysis...")
     async with ChatActionSender.typing(bot=message.bot, chat_id=message.chat.id):
         try:
@@ -79,30 +81,34 @@ async def handle_photo(message: Message, session: AsyncSession, redis: Redis) ->
                 cached,
                 from_cache=True,
             )
-            await send_recipe_batch(
-                message,
-                cached,
-                result_id=result.id,
-                from_cache=True,
-                redis=redis,
-            )
-            return
+            cached_batch = cached
+            cached_result_id = result.id
+        else:
+            await message.answer("🧊 Analyzing your fridge...")
+            try:
+                batch = await _analyze_photo_with_retries(
+                    image_bytes,
+                    preferences,
+                    message.from_user.id,
+                )
+            except Exception:
+                logger.exception("Photo analysis failed for user_id=%s", message.from_user.id)
+                await message.answer(
+                    "The AI service is busy right now. I tried a few times, but it still did not "
+                    "answer. Please resend the photo in a minute."
+                )
+                return
+            await set_cached(redis, image_bytes, batch, variant=cache_variant)
 
-        await message.answer("🧊 Analyzing your fridge...")
-        try:
-            batch = await _analyze_photo_with_retries(
-                image_bytes,
-                preferences,
-                message.from_user.id,
-            )
-        except Exception:
-            logger.exception("Photo analysis failed for user_id=%s", message.from_user.id)
-            await message.answer(
-                "The AI service is busy right now. I tried a few times, but it still did not "
-                "answer. Please resend the photo in a minute."
-            )
-            return
-        await set_cached(redis, image_bytes, batch, variant=cache_variant)
+    if cached_batch is not None:
+        await send_recipe_batch(
+            message,
+            cached_batch,
+            result_id=cached_result_id,
+            from_cache=True,
+            redis=redis,
+        )
+        return
 
     result = await save_recipe_result(session, message.from_user.id, "photo", batch)
     logger.info(

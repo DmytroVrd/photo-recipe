@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     OPENROUTER_VISION_MODEL: str = "openrouter/free"
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
+    CLOUDFLARE_ACCOUNT_ID: str = ""
+    CLOUDFLARE_API_TOKEN: str = ""
     PIXAZO_API_KEY: str = ""
     POLLINATIONS_API_KEY: str = ""
 

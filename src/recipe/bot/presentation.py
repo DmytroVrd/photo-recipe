@@ -17,7 +17,8 @@ from recipe.schemas.recipe import Recipe, RecipeBatch
 logger = logging.getLogger(__name__)
 
 _IMAGE_TIMEOUT_SECONDS = 35
-_PIXAZO_TIMEOUT_SECONDS = 75
+_CLOUDFLARE_TIMEOUT_SECONDS = 45
+_PIXAZO_TIMEOUT_SECONDS = 35
 _POLLINATIONS_MIN_INTERVAL_SECONDS = 20
 _POLLINATIONS_MAX_ATTEMPTS = 2
 _pollinations_lock = asyncio.Lock()
@@ -186,7 +187,7 @@ async def get_cached_dish_preview(
     redis: Redis | None,
     recipe: Recipe,
 ) -> BufferedInputFile | None:
-    for provider in ("pixazo", "pollinations"):
+    for provider in ("cloudflare", "pixazo", "pollinations"):
         cached = await _get_cached_dish_preview(redis, recipe, provider=provider)
         if cached is not None:
             return cached
@@ -341,11 +342,62 @@ async def _fetch_pixazo_dish_preview_bytes(recipe: Recipe) -> bytes | None:
         return None
 
 
+async def _fetch_cloudflare_dish_preview_bytes(recipe: Recipe) -> bytes | None:
+    if not settings.CLOUDFLARE_ACCOUNT_ID or not settings.CLOUDFLARE_API_TOKEN:
+        return None
+
+    started_at = time.perf_counter()
+    url = (
+        "https://api.cloudflare.com/client/v4/accounts/"
+        f"{settings.CLOUDFLARE_ACCOUNT_ID}/ai/run/"
+        "@cf/black-forest-labs/flux-1-schnell"
+    )
+    headers = {
+        "Authorization": f"Bearer {settings.CLOUDFLARE_API_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "prompt": _dish_image_prompt(recipe),
+        "steps": 4,
+    }
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=_CLOUDFLARE_TIMEOUT_SECONDS,
+            follow_redirects=True,
+        ) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
+            encoded_image = data.get("result", {}).get("image")
+            if not isinstance(encoded_image, str) or not encoded_image:
+                raise ValueError(f"Cloudflare returned no image: {data.get('errors', [])}")
+
+            image_bytes = base64.b64decode(encoded_image)
+            logger.info(
+                "Dish image fetched from Cloudflare for %s in %.2fs (%s bytes)",
+                recipe.title,
+                time.perf_counter() - started_at,
+                len(image_bytes),
+            )
+            return image_bytes
+    except Exception:
+        logger.warning(
+            "Cloudflare dish image preview failed for %s after %.2fs",
+            recipe.title,
+            time.perf_counter() - started_at,
+            exc_info=True,
+        )
+        return None
+
+
 async def _fetch_dish_preview(
     recipe: Recipe,
     redis: Redis | None = None,
 ) -> BufferedInputFile | None:
     providers = []
+    if settings.CLOUDFLARE_ACCOUNT_ID and settings.CLOUDFLARE_API_TOKEN:
+        providers.append(("cloudflare", _fetch_cloudflare_dish_preview_bytes))
     if settings.PIXAZO_API_KEY:
         providers.append(("pixazo", _fetch_pixazo_dish_preview_bytes))
     providers.append(("pollinations", _fetch_pollinations_dish_preview_bytes))

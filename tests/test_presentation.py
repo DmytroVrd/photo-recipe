@@ -141,3 +141,41 @@ async def test_pixazo_downloads_generated_image(monkeypatch: pytest.MonkeyPatch)
     )
 
     assert result == b"image-bytes"
+
+
+@pytest.mark.asyncio
+async def test_cloudflare_decodes_generated_image(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, Any]:
+            return {
+                "result": {
+                    "image": "aW1hZ2UtYnl0ZXM=",
+                },
+                "success": True,
+            }
+
+    class FakeClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> "FakeClient":
+            return self
+
+        async def __aexit__(self, *_: Any) -> None:
+            return None
+
+        async def post(self, *_: Any, **__: Any) -> FakeResponse:
+            return FakeResponse()
+
+    monkeypatch.setattr(presentation.settings, "CLOUDFLARE_ACCOUNT_ID", "account-id")
+    monkeypatch.setattr(presentation.settings, "CLOUDFLARE_API_TOKEN", "test-token")
+    monkeypatch.setattr(presentation.httpx, "AsyncClient", FakeClient)
+
+    result = await presentation._fetch_cloudflare_dish_preview_bytes(
+        _batch().recipes[0]
+    )
+
+    assert result == b"image-bytes"
