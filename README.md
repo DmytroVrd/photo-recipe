@@ -205,6 +205,7 @@ alembic upgrade head
 | `OPENROUTER_MODEL` | OpenRouter model, for example a free instruct model |
 | `OPENROUTER_VISION_MODEL` | OpenRouter fallback model for fridge photo analysis, for example `openrouter/free` on shared hosts where Gemini direct access is blocked |
 | `OPENROUTER_BASE_URL` | OpenRouter OpenAI-compatible base URL |
+| `PIXAZO_API_KEY` | Pixazo Flux 1 Schnell key used as the primary dish preview provider |
 | `POLLINATIONS_API_KEY` | Optional free Pollinations key for reliable dish previews; recommended on shared hosting |
 | `DATABASE_URL` | Async SQLAlchemy PostgreSQL URL |
 | `REDIS_URL` | Redis URL |

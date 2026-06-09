@@ -95,3 +95,49 @@ async def test_pollinations_queue_rejection_is_not_retried(
 
     assert result is None
     assert requests == 1
+
+
+@pytest.mark.asyncio
+async def test_pixazo_downloads_generated_image(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeResponse:
+        def __init__(
+            self,
+            *,
+            payload: dict[str, str] | None = None,
+            content: bytes = b"",
+            content_type: str = "application/json",
+        ) -> None:
+            self._payload = payload or {}
+            self.content = content
+            self.headers = {"content-type": content_type}
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, str]:
+            return self._payload
+
+    class FakeClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> "FakeClient":
+            return self
+
+        async def __aexit__(self, *_: Any) -> None:
+            return None
+
+        async def post(self, *_: Any, **__: Any) -> FakeResponse:
+            return FakeResponse(payload={"output": "https://cdn.example/dish.png"})
+
+        async def get(self, _: str) -> FakeResponse:
+            return FakeResponse(content=b"image-bytes", content_type="image/png")
+
+    monkeypatch.setattr(presentation.settings, "PIXAZO_API_KEY", "test-key")
+    monkeypatch.setattr(presentation.httpx, "AsyncClient", FakeClient)
+
+    result = await presentation._fetch_pixazo_dish_preview_bytes(
+        _batch().recipes[0]
+    )
+
+    assert result == b"image-bytes"

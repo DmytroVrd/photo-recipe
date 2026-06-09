@@ -17,6 +17,7 @@ from recipe.schemas.recipe import Recipe, RecipeBatch
 logger = logging.getLogger(__name__)
 
 _IMAGE_TIMEOUT_SECONDS = 35
+_PIXAZO_TIMEOUT_SECONDS = 75
 _POLLINATIONS_MIN_INTERVAL_SECONDS = 20
 _POLLINATIONS_MAX_ATTEMPTS = 2
 _pollinations_lock = asyncio.Lock()
@@ -185,7 +186,11 @@ async def get_cached_dish_preview(
     redis: Redis | None,
     recipe: Recipe,
 ) -> BufferedInputFile | None:
-    return await _get_cached_dish_preview(redis, recipe)
+    for provider in ("pixazo", "pollinations"):
+        cached = await _get_cached_dish_preview(redis, recipe, provider=provider)
+        if cached is not None:
+            return cached
+    return None
 
 
 async def _set_cached_dish_preview(
@@ -282,21 +287,82 @@ async def _fetch_pollinations_dish_preview_bytes(recipe: Recipe) -> bytes | None
     return None
 
 
+async def _fetch_pixazo_dish_preview_bytes(recipe: Recipe) -> bytes | None:
+    if not settings.PIXAZO_API_KEY:
+        return None
+
+    started_at = time.perf_counter()
+    headers = {
+        "Cache-Control": "no-cache",
+        "Ocp-Apim-Subscription-Key": settings.PIXAZO_API_KEY,
+    }
+    payload = {
+        "prompt": _dish_image_prompt(recipe),
+        "num_steps": 4,
+        "height": 512,
+        "width": 512,
+    }
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=_PIXAZO_TIMEOUT_SECONDS,
+            follow_redirects=True,
+        ) as client:
+            response = await client.post(
+                "https://gateway.pixazo.ai/flux-1-schnell/v1/getData",
+                headers=headers,
+                json=payload,
+            )
+            response.raise_for_status()
+            image_url = response.json().get("output")
+            if not isinstance(image_url, str) or not image_url.startswith("http"):
+                raise ValueError("Pixazo returned no image URL")
+
+            image_response = await client.get(image_url)
+            image_response.raise_for_status()
+            content_type = image_response.headers.get("content-type", "")
+            if not content_type.startswith("image/"):
+                raise ValueError(f"Pixazo returned non-image content: {content_type}")
+
+            logger.info(
+                "Dish image fetched from Pixazo for %s in %.2fs (%s bytes)",
+                recipe.title,
+                time.perf_counter() - started_at,
+                len(image_response.content),
+            )
+            return image_response.content
+    except Exception:
+        logger.warning(
+            "Pixazo dish image preview failed for %s after %.2fs",
+            recipe.title,
+            time.perf_counter() - started_at,
+            exc_info=True,
+        )
+        return None
+
+
 async def _fetch_dish_preview(
     recipe: Recipe,
     redis: Redis | None = None,
-    provider: str = "pollinations",
 ) -> BufferedInputFile | None:
-    cached = await _get_cached_dish_preview(redis, recipe, provider=provider)
-    if cached is not None:
-        return cached
+    providers = []
+    if settings.PIXAZO_API_KEY:
+        providers.append(("pixazo", _fetch_pixazo_dish_preview_bytes))
+    providers.append(("pollinations", _fetch_pollinations_dish_preview_bytes))
 
-    image_bytes = await _fetch_pollinations_dish_preview_bytes(recipe)
-    if image_bytes is None:
-        return None
+    for provider, fetch_image in providers:
+        cached = await _get_cached_dish_preview(redis, recipe, provider=provider)
+        if cached is not None:
+            return cached
 
-    await _set_cached_dish_preview(redis, recipe, image_bytes, provider=provider)
-    return BufferedInputFile(image_bytes, filename=_image_filename(recipe))
+        image_bytes = await fetch_image(recipe)
+        if image_bytes is None:
+            continue
+
+        await _set_cached_dish_preview(redis, recipe, image_bytes, provider=provider)
+        return BufferedInputFile(image_bytes, filename=_image_filename(recipe))
+
+    return None
 
 
 async def send_recipe_batch(

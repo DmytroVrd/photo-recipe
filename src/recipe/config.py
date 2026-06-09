@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     OPENROUTER_VISION_MODEL: str = "openrouter/free"
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
+    PIXAZO_API_KEY: str = ""
     POLLINATIONS_API_KEY: str = ""
 
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/photo_recipe"
