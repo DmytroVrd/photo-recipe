@@ -86,32 +86,50 @@ def _analyze_via_openrouter(
     if not settings.OPENROUTER_API_KEY:
         raise RuntimeError("OPENROUTER_API_KEY is required for the fallback vision path")
 
-    logger.info("Analyzing photo with OpenRouter vision model=%s", settings.OPENROUTER_VISION_MODEL)
     client = OpenAI(
         api_key=settings.OPENROUTER_API_KEY,
         base_url=settings.OPENROUTER_BASE_URL,
     )
     image_b64 = base64.b64encode(image_bytes).decode()
     image_url = f"data:{mime_type};base64,{image_b64}"
+    fallback_models = [
+        model.strip()
+        for model in settings.OPENROUTER_VISION_FALLBACK_MODELS.split(",")
+        if model.strip()
+    ]
+    models = list(dict.fromkeys([settings.OPENROUTER_VISION_MODEL, *fallback_models]))
+    last_error: Exception | None = None
 
-    response = client.chat.completions.create(
-        model=settings.OPENROUTER_VISION_MODEL,
-        messages=[
-            {"role": "system", "content": _SYSTEM},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": _user_prompt(preferences)},
-                    {"type": "image_url", "image_url": {"url": image_url}},
+    for model in models:
+        logger.info("Analyzing photo with OpenRouter vision model=%s", model)
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": _SYSTEM},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": _user_prompt(preferences)},
+                            {"type": "image_url", "image_url": {"url": image_url}},
+                        ],
+                    },
                 ],
-            },
-        ],
-        temperature=0.2,
-        response_format={"type": "json_object"},
-    )
-    raw = (response.choices[0].message.content or "").strip()
-    data = parse_json_object(raw)
-    return RecipeBatch.model_validate(data)
+                temperature=0.2,
+                response_format={"type": "json_object"},
+            )
+            raw = (response.choices[0].message.content or "").strip()
+            data = parse_json_object(raw)
+            return RecipeBatch.model_validate(data)
+        except Exception as exc:
+            last_error = exc
+            logger.warning(
+                "OpenRouter vision model %s failed; trying the next configured model",
+                model,
+                exc_info=True,
+            )
+
+    raise RuntimeError("All configured OpenRouter vision models failed") from last_error
 
 
 def _is_geo_block(error: ClientError) -> bool:

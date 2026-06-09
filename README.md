@@ -203,7 +203,8 @@ alembic upgrade head
 | `GEMINI_MODEL` | Gemini model, for example `gemini-2.5-flash` |
 | `OPENROUTER_API_KEY` | OpenRouter key for URL normalization and fallback LLM work |
 | `OPENROUTER_MODEL` | OpenRouter model, for example a free instruct model |
-| `OPENROUTER_VISION_MODEL` | OpenRouter fallback model for fridge photo analysis, for example `openrouter/free` on shared hosts where Gemini direct access is blocked |
+| `OPENROUTER_VISION_MODEL` | Primary OpenRouter vision model used when direct Gemini access is blocked |
+| `OPENROUTER_VISION_FALLBACK_MODELS` | Comma-separated fallback vision models tried when the primary model fails or returns invalid JSON |
 | `OPENROUTER_BASE_URL` | OpenRouter OpenAI-compatible base URL |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account used for Workers AI dish previews |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare token with Workers AI Read and Edit permissions |

@@ -21,7 +21,7 @@ from recipe.vision.analyzer import analyze_photo
 logger = logging.getLogger(__name__)
 router = Router()
 
-_ANALYSIS_RETRY_DELAYS_SECONDS = (5, 10)
+_ANALYSIS_RETRY_DELAYS_SECONDS = (5,)
 
 
 async def _analyze_photo_with_retries(image_bytes: bytes, preferences, user_id: int):

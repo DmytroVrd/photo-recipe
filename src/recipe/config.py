@@ -14,7 +14,10 @@ class Settings(BaseSettings):
 
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_MODEL: str = "meta-llama/llama-3.3-70b-instruct:free"
-    OPENROUTER_VISION_MODEL: str = "openrouter/free"
+    OPENROUTER_VISION_MODEL: str = "google/gemma-4-26b-a4b-it:free"
+    OPENROUTER_VISION_FALLBACK_MODELS: str = (
+        "google/gemma-4-31b-it:free,nex-agi/nex-n2-pro:free"
+    )
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
     CLOUDFLARE_ACCOUNT_ID: str = ""
